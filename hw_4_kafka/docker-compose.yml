@@ -1,0 +1,88 @@
+  services:
+    kafka:
+      image: apache/kafka:latest
+      container_name: kafka
+      hostname: kafka
+      ports:
+        - "${KAFKA_PORT_HOST}:${KAFKA_PORT_HOST}"
+      environment:
+        KAFKA_BROKER_ID: 1
+        KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+        KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:${KAFKA_PORT},PLAINTEXT_HOST://localhost:${KAFKA_PORT_HOST}
+        KAFKA_LISTENERS: PLAINTEXT://kafka:${KAFKA_PORT},CONTROLLER://kafka:${KAFKA_PORT_CONTROLLER},PLAINTEXT_HOST://0.0.0.0:${KAFKA_PORT_HOST}
+        KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+        KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+        KAFKA_PROCESS_ROLES: broker,controller
+        KAFKA_NODE_ID: 1
+        KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:${KAFKA_PORT_CONTROLLER}
+        KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+        KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+        KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+        KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+        KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+        CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      networks:
+        - ms_network
+
+    db:
+      image: postgres:16-alpine
+      container_name: db
+      env_file:
+        - .env
+      environment:
+        POSTGRES_DB: ${POSTGRES_DB}
+        POSTGRES_USER: ${POSTGRES_USER}
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      ports:
+        - "${DB_HOST_PORT}:${DB_CONTAINER_PORT}"
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
+      networks:
+        - ms_network
+      healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+        interval: 5s
+        timeout: 5s
+        retries: 10
+
+    producer:
+      build:
+        context: ./producer
+        dockerfile: Dockerfile
+      env_file:
+        - .env
+      ports:
+        - "${PRODUCER_HOST_PORT}:${PRODUCER_CONTAINER_PORT}"
+      environment:
+        - PRODUCER_CONTAINER_PORT=${PRODUCER_CONTAINER_PORT}
+        - KAFKA_HOST=${KAFKA_HOST}
+        - KAFKA_PORT=${KAFKA_PORT}
+        - KAFKA_TOPIC=${KAFKA_TOPIC}
+      networks:
+        - ms_network
+
+    consumer:
+      build:
+        context: ./consumer
+        dockerfile: Dockerfile
+      env_file:
+        - .env
+      ports:
+      - "${CONSUMER_HOST_PORT}:${CONSUMER_CONTAINER_PORT}"
+      environment:
+        - CONSUMER_CONTAINER_PORT=${CONSUMER_CONTAINER_PORT}
+        - KAFKA_HOST=${KAFKA_HOST}
+        - KAFKA_PORT=${KAFKA_PORT}
+        - KAFKA_TOPIC=${KAFKA_TOPIC}
+        - KAFKA_PARTITION=${KAFKA_PARTITION}
+      networks:
+        - ms_network
+      depends_on:
+        db:
+          condition: service_healthy
+
+  networks:
+    ms_network:
+
+  volumes:
+    postgres_data:
