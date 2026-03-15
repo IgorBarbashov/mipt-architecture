@@ -2,4 +2,4 @@
 
 **Магистратура МФТИ "Разработка IT-продукта"**
 
-- [Домашнее задание 3. Docker compose](./hw_3/README.md)
+- [Домашнее задание 3. Docker compose](./hw_3_docker_compose/README.md)
